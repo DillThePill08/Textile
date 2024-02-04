@@ -1,0 +1,21 @@
+<html>
+    <head>
+        <title>Textile Compiler/Executor</title>
+        <script src="/index.js"></script>
+        <script src="/compiler.js"></script>
+        <script src="/executor.js"></script>
+        
+    </head>
+    <body>
+        <h1><a href="https://esolangs.org/wiki/Tile/Textile">Textile</a> by <a href="https://esolangs.org/wiki/User:Dtp09">Dtp09</a></h1>
+        <h3>i hate making websites so you'll have to deal this ugly ui</h3>
+        <p>program here</p>
+        <textarea rows="30" cols="20" id="program"></textarea>
+        <p>input here</p>
+        <textarea rows="2" cols="30" id="input"></textarea>
+        </br></br></br>
+        <button onclick="run(document.getElementById('program').value, document.getElementById('input').value)">compile and execute</button>
+        </br>
+        <textarea rows="4" cols="30" id="output" disabled="true"></textarea>
+    </body>
+</html>
