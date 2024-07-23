@@ -1,0 +1,515 @@
+GET_PTR: { #get the memory address the pointer points to
+push $FF,$FE
+read
+push $FF,$FF
+read
+}
+
+GET_PTR_VAL: {
+[GET_PTR]
+read
+}
+
+POP: {
+push
+mul
+add
+}
+
+DUPE_PTR: {
+    #store pc lo
+push $FF,$FB
+write
+    #store pc hi
+add*2
+[POP]
+push $FF,$FA
+write
+    #restore lo
+push 1
+add
+read
+    #dupe hi
+push $FF,$FA
+read
+    #dupe lo
+push $FF,$FB
+read
+}
+
+#-------------------------------------------------
+
+MAIN: {
+jump GET_INPUT_POS
+}
+
+#--------------------------------
+
+GET_INPUT_POS: { #get the first byte where input is
+    #is \0 or ";" then set input pos
+input
+push
+equal INC_INPUT_POS
+push ";"
+add
+equal INC_INPUT_POS
+    #neither; increment read byte
+add
+[POP]
+    #increment lo byte
+push 1
+add
+    #byte overflow
+push
+equal INPUT_POS_OVERFLOW
+    #loop
+add
+jump GET_INPUT_POS
+}
+
+INPUT_POS_OVERFLOW: {
+push 1
+add*3
+push
+jump GET_INPUT_POS
+}
+
+###############################
+
+INC_INPUT_POS: {
+add
+[POP]
+    #increment
+push 1
+add
+    #overflow :skull:
+push
+equal INPUT_SET_OVERFLOW
+add
+jump SET_INPUT_POS
+}
+
+INPUT_SET_OVERFLOW: {
+push 1
+add*3
+push
+jump SET_INPUT_POS
+}
+
+SET_INPUT_POS: {
+    #set lo byte
+push $FF,$FD
+write
+    #pop
+add*2
+[POP]
+    #set hi byte
+push $FF,$FC
+write
+    #pop
+add*2
+[POP]
+jump CHECK_INPUT #enter main program loop
+}
+
+#----------------------------------------------
+
+CHECK_INPUT: { #compare input to characters
+input
+push "+" 
+equal INC
+push 2
+add      # "-"
+equal DEC
+push 15
+add      # "<"
+equal LEFT
+push 2
+add      # ">"
+equal RIGHT
+push 16
+sub      # "."
+equal OUT
+push 2
+sub      # ","
+equal INPUT 
+push 47
+add      # "["
+equal LOOP_OPEN
+push 2
+add      # "]"
+equal LOOP_CLOSED
+    #end of program check
+push
+mul
+equal EXIT
+push ";"
+add
+equal EXIT
+    #no match, jump to increment
+add
+[POP]
+jump PC_INC
+}
+
+#---------------------------
+
+INC: { #push memory address at pointer, increment
+[GET_PTR_VAL]
+push 1
+add
+jump INC_DEC
+}
+
+DEC: { #push memory address at pointer, decrement
+[GET_PTR_VAL]
+push 1
+sub
+jump INC_DEC
+}
+
+INC_DEC: { 
+[GET_PTR]
+write
+add*4
+[POP]
+jump PC_INC
+}
+
+#--------------------------------------------------
+
+RIGHT: {
+    #increment the pointer
+[GET_PTR]
+push 1
+add
+    #address overflow
+push
+equal PTR_OVERFLOW
+    #check for $FFFA
+push $FA
+add
+equal BYPASS_RIGHT_LO
+[POP]
+jump LEFT_RIGHT
+}
+
+PTR_OVERFLOW: {
+push 1         
+add*3          
+push           
+jump LEFT_RIGHT
+}
+
+BYPASS_RIGHT_LO: {
+    #get to hi byte
+add
+[POP]
+    #check FF
+push $FF
+equal BYPASS_RIGHT_HI
+    #if it isn't FF
+[POP]
+push $FA
+jmp LEFT_RIGHT
+}
+
+BYPASS_RIGHT_HI: { #ptr is FFFA, set to 0000
+add
+[POP]
+push*2
+jmp LEFT_RIGHT
+}
+
+###############
+
+LEFT: {
+    #decrement pointer
+[GET_PTR]
+push 1
+sub
+    #address underflow
+push $FF
+equal PTR_UNDERFLOW
+push 1
+add*2
+jump LEFT_RIGHT
+}
+
+PTR_UNDERFLOW: {
+    #get to hi ptr byte and decrement
+add
+[POP]
+push 1
+sub
+push $FF
+    #if we're on $FFFF
+equal BYPASS_LEFT
+jump LEFT_RIGHT
+}
+
+BYPASS_LEFT: { #set PTR to $FFF9
+push 6
+sub
+jump LEFT_RIGHT
+}
+
+###############
+
+LEFT_RIGHT: {
+   #set $FFFF to top stack
+push $FF,$FF
+write
+   #pop 3
+add*2
+[POP]
+   #set $FFFE to 2nd top stack
+push $FF,$FE
+write
+add*4
+[POP]
+jump PC_INC
+}
+
+#---------------------------------------
+
+OUT: {
+[GET_PTR_VAL]
+out
+add
+[POP]
+jump PC_INC
+}
+
+#---------------------------------------
+
+INPUT: {
+    #push address in memory starting on $FFFC
+push $FF,$FC
+read
+push $FF,$FD
+read
+    #push input
+input
+    #store to pointer 
+[GET_PTR]
+write
+    #increment input pos
+push $FF,$FC
+read
+push $FF,$FD
+read
+push 1
+add
+    #more overflow
+push
+equal INPUT_OVERFLOW
+add
+jump FINISH_INPUT
+}
+
+INPUT_OVERFLOW: {
+push 1
+add*3
+push
+jump FINISH_INPUT
+}
+
+FINISH_INPUT: {
+    #write to input pos bytes
+    #set lo byte
+push $FF,$FD
+write
+    #pop
+add*2
+[POP]
+    #set hi byte
+push $FF,$FC
+write
+    #pop
+add*9
+[POP]
+jump PC_INC
+}
+
+#----------------------------------------
+
+LOOP_OPEN: {
+    #compare ptr to 0
+[GET_PTR_VAL]
+push
+equal JMP_BRACE
+    #pop from stack to get to PC values
+add*3
+[POP]
+[DUPE_PTR]
+    #loop over
+jump PC_INC
+}
+
+################
+
+JMP_BRACE: {
+    #pop 4
+add*3
+[POP]
+    #write 1 to $FFFB
+push 1,$FF,$FB
+write
+add*2
+[POP]
+jump MATCH_BRACE
+}
+
+MATCH_BRACE: {
+    #increment PC
+push 1
+add
+    #OVERFLOW
+push
+equal MATCH_OVERFLOW
+add
+jump MATCH_CHECK
+}
+
+MATCH_OVERFLOW: {
+push 1
+add*3
+push
+jump MATCH_CHECK
+}
+
+MATCH_CHECK: {
+    #input and check for either brackets or end
+input
+push "["
+equal MATCH_INC
+push 2
+add  #"]"
+equal MATCH_DEC
+    #the brackets could be uneven
+push
+mul  #"\0"
+equal EXIT
+push ";"
+add  #";"
+equal EXIT
+    #none match, loop over
+add
+[POP]
+jump MATCH_BRACE
+}
+
+MATCH_INC: {
+    #increment $FFFB
+push 1,$FF,$FB
+read
+add
+push $FF,$FB
+write
+    #pop and loop
+add*4
+[POP]
+jump MATCH_BRACE
+}
+
+MATCH_DEC: {
+    #decrement $FFFB
+push $FF,$FB
+read
+push 1
+sub
+    #if FFFB == 0 then exit this loop
+push
+equal END_MATCH
+    #if FFFB != 0
+add
+push $FF,$FB
+write
+    #pop and loop
+add*4
+[POP]
+jump MATCH_BRACE
+}
+
+END_MATCH: {
+add*3
+[POP]
+jump PC_INC
+}
+
+#----------------------------------------
+
+LOOP_CLOSED: {
+[GET_PTR_VAL]
+    #compare to 0
+push
+equal EXIT_LOOP
+    #not 0, loop over
+add*5
+[POP]
+[DUPE_PTR]
+jump PC_INC
+}
+
+EXIT_LOOP: {
+    #pop 4
+add*3
+[POP]
+    #store ptr
+push $FF,$FB
+write
+add*2
+[POP]
+push $FF,$FA
+write
+    #pop from loop stack
+add*4
+[POP]
+    #restore ptr
+push $FF,$FA
+read
+push $FF,$FB
+read
+jump PC_INC
+}
+
+#----------------------------------------
+
+PC_INC: { #stack should be on pc_lo
+    #inc
+push 1
+add
+    #pc overflow
+push
+equal PC_OVERFLOW
+add
+jump CHECK_INPUT
+}
+
+PC_OVERFLOW: {
+    #pop 2, adding 1 to PC_hi
+push 1
+add*3
+push #restore PC_lo
+jump CHECK_INPUT
+}
+
+EXIT: {
+debug
+}
+
+#memory map
+#0000 - FFF9 : brainfuck memory
+#FFFA : temp byte hi
+#FFFB : temp byte lo
+#FFFC : input pos hi byte
+#FFFD : input pos lo byte
+#FFFE : ptr hi byte
+#FFFF : ptr lo byte
+
+#interpreter specs:
+#cell storage type: unsigned 8-bit
+#loop depth: unlimited
+#max program length: 2^16
+#cells: 2^16 - 6 (65530)
